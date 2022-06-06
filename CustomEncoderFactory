@@ -1,0 +1,50 @@
+import torch
+import torch.nn as nn
+from d3rlpy.models.encoders import EncoderFactory
+
+
+# your own neural network
+class CustomEncoder(nn.Module):
+    def __init__(self, feature_size, input_size, hidden_size, num_layers, seq_length):
+        super(LSTM1, self).__init__()
+        self.feature_size = feature_size  # number of features
+        self.num_layers = num_layers  # number of layers
+        self.input_size = input_size  # input size
+        self.hidden_size = hidden_size  # hidden state
+        self.seq_length = seq_length  # sequence length
+
+        self.lstm = nn.LSTM(input_size=input_size, hidden_size=hidden_size,
+                            num_layers=num_layers, batch_first=True)  # lstm
+        self.fc_1 = nn.Linear(hidden_size, 128)  # fully connected 1
+        self.fc = nn.Linear(128, feature_size)  # fully connected last layer
+
+        self.relu = nn.ReLU()
+
+    def forward(self, x):
+        h_0 = Variable(torch.zeros(self.num_layers, x.size(0), self.hidden_size))  # hidden state
+        c_0 = Variable(torch.zeros(self.num_layers, x.size(0), self.hidden_size))  # internal state
+        # Propagate input through LSTM
+        output, (hn, cn) = self.lstm(x, (h_0, c_0))  # lstm with input, hidden, and internal state
+        hn = hn.view(-1, self.hidden_size)  # reshaping the data for Dense layer next
+        out = self.relu(hn)
+        out = self.fc_1(out)  # first Dense
+        out = self.relu(out)  # relu
+        out = self.fc(out)  # Final Output
+        return out
+
+    # THIS IS IMPORTANT!
+    def get_feature_size(self):
+        return self.feature_size
+
+# your own encoder factory
+class CustomEncoderFactory(EncoderFactory):
+    TYPE = 'custom' # this is necessary
+
+    def __init__(self, feature_size):
+        self.feature_size = feature_size
+
+    def create(self, observation_shape):
+        return CustomEncoder(observation_shape, self.feature_size)
+
+    def get_params(self, deep=False):
+        return {'feature_size': self.feature_size}
